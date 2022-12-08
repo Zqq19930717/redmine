@@ -1,0 +1,148 @@
+{% extends 'layout/basic.html' %}
+{% load static %}
+
+{% block title %} 短信登录 {% endblock %}
+
+{% block css %}
+    <link rel="stylesheet" href="{% static 'css/account.css' %}">
+    <style>
+        .error-msg {
+            color: red;
+            position: absolute;
+            font-size: 13px;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+    <div class="account">
+        <div class="title">短信登录</div>
+        <form id="smsForm" method="POST" novalidate>
+            {% csrf_token %}
+            {% for field in form %}
+                {% if field.name == 'code' %}
+                    <div class="form-group">
+                        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        <div class="row">
+                            <div class="col-xs-7">
+                                {{ field }}
+                                <span class="error-msg">{{ field.errors.0 }}</span>
+                            </div>
+                            <div class="col-xs-5">
+                                <input id="btnSms" type="button" class="btn btn-default" value="点击获取验证码">
+                            </div>
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="form-group">
+                        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        {{ field }}
+                        <span class="error-msg">{{ field.errors.0 }}</span>
+                    </div>
+                {% endif %}
+            {% endfor %}
+            <div class="row">
+                <div class="col-xs-3">
+                    <input id="btnSubmit" type="button" class="btn btn-primary" value="登 录"/>
+                </div>
+                <div style="float: right" class="col-xs-5">
+                    <a href="{% url 'login' %}">用户名密码登录 </a>
+                </div>
+            </div>
+        </form>
+    </div>
+{% endblock %}
+
+
+{% block js %}
+    <script src="{% static 'plugins/carhartl-jquery-cookie-92b7715/jquery.cookie.js' %}"></script>
+    <script type="text/javascript">
+        // 页面框架加载完成之后自动执行函数
+        $(function () {
+            // 绑定点击获取验证码事件
+            bindSendCode();
+            // 绑定点击登录按钮事件
+            bindSMSLogin();
+        })
+
+        /*
+        点击注册按钮的绑定事件
+         */
+        function bindSMSLogin() {
+            $("#btnSubmit").click(function () {
+                // 将所有错误信息清空
+                $(".error-msg").empty()
+                $.ajax({
+                    url: "{% url 'login_sms' %}",
+                    type: "post",
+                    {#引入jquery_cookie.js后在加入下面一句就可以避免csrf_token的影响#}
+                    headers: {"X-CSRFToken": $.cookie('csrftoken')},
+                    data: $("#smsForm").serialize(),    // 将用户在表单的input框输入的所有数据传输给后端request.POST
+                    dataType: 'JSON',
+                    success: function (res) {
+                        if (res.status) {
+                            location.href = res.data; // 跳转到res.data指定的/index/地址
+                        } else {
+                            $.each(res.error, function (key, value) {
+                                $("#id_" + key).next().text(value[0])
+                            })
+                        }
+                    }
+                })
+            })
+        }
+
+        /*
+        点击获取验证码按钮的绑定事件
+         */
+        function bindSendCode() {
+            $("#btnSms").click(function () {
+                // 将所有错误信息清空
+                $(".error-msg").empty()
+                // 获取用户输入的手机号
+                var mobilePhone = $("#id_mobile_phone").val();
+                // 发送ajax请求, 把手机号发送过去
+                $.ajax({
+                    {#url: "{% url 'send_sms' %}", // 等价于 url: "/send/sms/",#}
+                    url: "{% url 'send_sms' %}",
+                    type: "get",
+                    data: {
+                        "tpl": "login",
+                        "mobile_phone": mobilePhone
+                    },
+                    dataType: "JSON", // 将后端返回的数据反序列化为字典
+                    success: function (res) {
+                        if (res.status) {
+                            sendSmsRemind();
+                        } else {
+                            $.each(res.error, function (key, value) {    // key就是mobile_phone, value就是错误信息, 可以console.log(res.error);看看
+                                $("#id_" + key).next().text(value[0])
+                            })
+                        }
+                    }
+                })
+
+            })
+        }
+
+        /*
+            倒计时
+         */
+        function sendSmsRemind() {
+            var time = 60;
+            var $smsBtn = $('#btnSms');
+            $smsBtn.prop('disabled', true);   // 让该按钮不可再被点击
+            var remind = setInterval(function () {       // 定义定时器
+                $smsBtn.val(time + "秒重新获取");
+                time = time - 1;
+                if (time < 1) {
+                    clearInterval(remind)   // 清除定时器
+                    $smsBtn.val("点击获取验证码").prop('disabled', false);   // 将按钮值更新为点击获取验证码, 并让按钮可点击
+                }
+            }, 1000)    // 每1000ms 执行一次前面一个参数function
+
+        }
+
+    </script>
+
+{% endblock %}

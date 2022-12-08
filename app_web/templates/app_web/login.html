@@ -1,0 +1,79 @@
+{% extends 'layout/basic.html' %}
+{% load static %}
+
+{% block title %} 用户登录 {% endblock %}
+
+{% block css %}
+    <link rel="stylesheet" href="{% static 'css/account.css' %}">
+    <style>
+        .error-msg {
+            color: red;
+            position: absolute;
+            font-size: 13px;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+    <div class="account">
+        <div class="title">用户登录</div>
+        <form method="POST" novalidate>
+            {% csrf_token %}
+            {% for field in form %}
+                {#     如果是验证码，就左右展示  #}
+                {% if field.name == 'code' %}
+                    <div class="form-group">
+                        {# for的含义：是把标签和表单元素绑定；效果是点击标签时，可以触发表单控件。 通常效果：比如输入用户名，#}
+                        {# 当你点击“用户名”时，光标自动就定位到“用户名”后面的输入框，不需要把鼠标精确挪到输入框。#}
+                        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        <div class="row">
+                            <div class="col-xs-7">
+                                {{ field }}
+                                <span class="error-msg">{{ field.errors.0 }}</span>
+                            </div>
+                            <div class="col-xs-5">
+                                <img src="{% url 'image_code' %}" id="image_code" title="点击更换验证码">
+                            </div>
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="form-group">
+                        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        {{ field }}
+                        <span class="error-msg">{{ field.errors.0 }}</span>
+                    </div>
+                {% endif %}
+            {% endfor %}
+            <div class="row">
+                <div class="col-xs-3">
+                    <input id="btnSubmit" type="submit" class="btn btn-primary" value="登 录"/>
+                </div>
+                <div style="float: right" class="col-xs-5">
+                    <a href="{% url 'login_sms' %}">短信验证码登录 </a>
+                </div>
+            </div>
+        </form>
+    </div>
+{% endblock %}
+
+{% block js %}
+    <script type="text/javascript">
+        $(function () {
+            bindFreshImageCode();
+        })
+
+        function bindFreshImageCode() {
+            $("#image_code").click(function () {
+                /*
+                    直接reload其实也可以
+                    location.reload();
+                 */
+                var originSrc = $(this).attr('src');    // 获取原来的src地址
+                $(this).attr('src', originSrc + '?');   // 将原来的src地址后面加一个?, 相当于再发了一个请求
+
+            })
+        }
+
+
+    </script>
+{% endblock %}

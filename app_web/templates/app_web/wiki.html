@@ -1,0 +1,172 @@
+{% extends 'layout/manage.html' %}
+{% load static %}
+
+{% block css %}
+    <link rel="stylesheet" href="{% static 'plugins/editor-md/css/editormd.preview.min.css' %}">
+    <style>
+        .panel-default {
+            margin-top: 10px;
+        }
+
+        .panel-default .panel-heading {
+            display: flex;
+            flex-direction: row;
+            justify-content: space-between;
+        }
+
+        .panel-body {
+            padding: 0;
+        }
+
+        .title_list ul {
+            padding-left: 15px;
+        }
+
+        .title_list ul a {
+            display: block;
+            padding: 5px 0;
+        }
+
+        .title_list {
+            border-right: 1px solid #dddddd;
+            min-height: 500px;
+        }
+
+        .content {
+            border-left: 1px solid #dddddd;
+            min-height: 600px;
+            margin-left: -1px;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+    <div class="container-fluid">
+        <div class="panel panel-default">
+            <div class="panel-heading">
+                <div>
+                    <i class="fa fa-book" aria-hidden="true"></i>
+                    wiki文档
+                </div>
+                <div class="function">
+                    <a type="button" class="btn btn-success btn-xs"
+                       href="{% url 'wiki_add' project_id=request.redmine.project.id %}">
+                        <i class="fa fa-plus-circle" aria-hidden="true"></i> 新建
+                    </a>
+                    {% if wiki_object %}
+                        <a type="button" class="btn btn-primary btn-xs"
+                           href="{% url 'wiki_edit' project_id=request.redmine.project.id edit_id=wiki_object.id %}">
+                            <i class="fa fa-edit" aria-hidden="true"></i> 编辑
+                        </a>
+                        <a type="button" class="btn btn-danger btn-xs"
+                           href="{% url 'wiki_delete' project_id=request.redmine.project.id delete_id=wiki_object.id %}">
+                            <i class="fa fa-trash" aria-hidden="true"></i> 删除
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="panel-body">
+                <div class="col-sm-3 title_list">
+                    <ul id="catalog">
+
+                    </ul>
+                </div>
+                <div class="col-sm-9 content">
+                    {% if wiki_object %} <!-- 查到了wiki_id就展示文章内容，否则展示wiki首页 -->
+                        <div id="previewMarkdown">
+                            <textarea> {{ wiki_object.content }} </textarea>
+                        </div>
+
+                    {% else %}
+                        <div style="text-align: center; margin-top: 50px">
+                            <h4>《{{ request.redmine.project.name }}》wiki文档库</h4>
+                            <a href="{% url 'wiki_add' project_id=request.redmine.project.id %}">
+                                <i class="fa fa-plus-square" aria-hidden="true"></i>
+                                新建文档
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+{% endblock %}
+
+{% block js %}
+    <script src="{% static 'plugins/editor-md/editormd.min.js' %}"></script>
+    <script src="{% static 'plugins/editor-md/lib/marked.min.js' %}"></script>
+    <script src="{% static 'plugins/editor-md/lib/prettify.min.js' %}"></script>
+    <script src="{% static 'plugins/editor-md/lib/raphael.min.js' %}"></script>
+    <script src="{% static 'plugins/editor-md/lib/underscore.min.js' %}"></script>
+    <script src="{% static 'plugins/editor-md/lib/sequence-diagram.min.js' %}"></script>
+    <script src="{% static 'plugins/editor-md/lib/flowchart.min.js' %}"></script>
+    <script src="{% static 'plugins/editor-md/lib/jquery.flowchart.min.js' %}"></script>
+
+    <script>
+        var WIKI_DETAIL_URL = "{% url 'wiki' project_id=request.redmine.project.id %}";
+        var WIKI_UPLOAD_URL = "{% url 'wiki_upload' project_id=request.redmine.project.id %}";
+
+        $(function () {
+            initCatalog();
+            initPreviewMarkdown();
+        });
+
+        function initPreviewMarkdown() {
+            editormd.markdownToHTML("previewMarkdown", {
+                htmlDecode: "style,script,iframe",
+                imageUpload: true,  // 支持本地上传
+                imageFormats: ["jpg", "jpeg", "gif", "png", "bmp", "webp"],  // 图片上传格式类型
+                imageUploadURL: WIKI_UPLOAD_URL,  // 图片保存文件夹名称
+                theme: 'default',  // 编辑框主题 ，dark / default
+                preview_theme: 'default',  // 预览区域主题， dark / default
+                editor_theme: 'default',  // edit区域主题，pastel-on-dark / default
+                toolbar_autofixed: true,  // 工具栏是否吸顶
+                search_replace: true,  // 是否开启查找替换
+                emoji: true,  // 是否开启表情功能
+                tex: true,  // 是否开启 tex 图表功能
+                flow_chart: true,  // 是否开启流程图功能
+                sequence: true,  // 是否开启序列图功能
+                watch: true,  // 实时预览
+                lineWrapping: true,  // 自动换行
+                lineNumbers: true  // 行号
+            });
+        }
+
+        function initCatalog() {
+            $.ajax({
+                url: "{% url 'wiki_catalog' project_id=request.redmine.project.id%}",
+                type: "GET",
+                dataType: "JSON",
+                success: function (res) {
+                    if (res.status) {
+                        $.each(res.data, function (index, item) {
+                            // values_list出来的, item是data的值 [1, '洪湖水', null], [2, '新堤', 1]..., index是data的key
+                            // values出来的, item是data的值 {'id':1, 'title':'洪湖水', 'parent_id':null}..., index是data的key
+                            // 生成这种标签：<li id='id_xx'><a>目录2</a></li>，添加到class为catalog中
+                            var href = WIKI_DETAIL_URL + "?wiki_id=" + item.id;
+                            var li = $("<li>").attr('id', "id_" + item.id).append($("<a>").text(item.title).attr('href', href)).append($("<ul>"));
+                            if (!item.parent_id) { // 没有父ID
+                                $('#catalog').append(li);
+                            } else {
+                                /* 应该生成这类标签,
+                                <li>
+                                    <a>根目录</a>
+                                    <ul>
+                                        <li></li>
+                                    </ul>
+                                </li>
+                                 */
+                                $("#id_" + item.parent_id).children('ul').append(li)
+                            }
+                        })
+                    } else {
+
+                    }
+                }
+
+            })
+        }
+    </script>
+{% endblock %}
